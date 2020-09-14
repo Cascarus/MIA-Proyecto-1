@@ -135,7 +135,5 @@ func Crear_directorio(path string) {
 		}
 		//fmt.Println("se ha creado!!")
 
-	} else {
-		//fmt.Println("Ya existe!!")
 	}
 }

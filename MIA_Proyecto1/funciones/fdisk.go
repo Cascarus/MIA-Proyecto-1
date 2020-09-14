@@ -4,7 +4,6 @@ import (
 	"MIA_Proyecto1/estructuras"
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -36,18 +35,18 @@ func (e fdisk) Ejecutar() {
 	} else {
 
 		if e.opcionFD == 0 {
-			agregar(e.size, e.unit, e.path, e.tipo, e.fit, e.name)
+			agregar_particion(e.size, e.unit, e.path, e.tipo, e.fit, e.name)
+		} else if e.opcionFD == 1 {
+			eliminar_particion(e.eliminar, e.path, e.name)
 		}
 	}
 }
 
-func agregar(size int64, unit byte, path string, tipo byte, fit string, name string) {
-	fmt.Println("Llego a agregar")
-	fmt.Println("size:", size, " unit:", unit, " path:", path, " tipo:", tipo, " fit:", fit, " name:", name)
+func agregar_particion(size int64, unit byte, path string, tipo byte, fit string, name string) {
 	disco := estructuras.Nodo_Mbr{}
 
 	var tamanio_mbr int = int(unsafe.Sizeof(disco))
-	//fmt.Println("el tam de mbr es: ", tamanio_mbr)
+	////fmt.Println("el tam de mbr es: ", tamanio_mbr)
 
 	file, err := os.OpenFile(path, os.O_RDWR, 0777)
 	defer file.Close()
@@ -77,8 +76,6 @@ func agregar(size int64, unit byte, path string, tipo byte, fit string, name str
 
 	copy(particion_nueva.Part_name[:], name)
 
-	//var part_start int64 = int64(tamanio_mbr)
-	//fmt.Println("part start: ", part_start)
 	insertado := false
 	//switch para cada tipo de particion
 	//Primaria
@@ -95,7 +92,6 @@ func agregar(size int64, unit byte, path string, tipo byte, fit string, name str
 		}
 
 		for i := 0; i < 4; i++ {
-			//fmt.Println("part_start_A", i, ": ", part_start)
 			if disco.Partition[i].Part_status == 0 {
 				disco.Partition[i] = particion_nueva
 				insertado = true
@@ -112,6 +108,7 @@ func agregar(size int64, unit byte, path string, tipo byte, fit string, name str
 			var binario bytes.Buffer
 			binary.Write(&binario, binary.BigEndian, &disco)
 			escribirBytes(file, binario.Bytes())
+			Add_particion(path, name)
 			Mensaje("Se ha creado la particion con exito", 1)
 		}
 
@@ -119,7 +116,7 @@ func agregar(size int64, unit byte, path string, tipo byte, fit string, name str
 	} else if tipo == 101 {
 
 		if espacio_disponible(disco)-particion_nueva.Part_size < 0 {
-			Mensaje("121: No hay suficiente espacio en el disco para crear la particion", 2)
+			Mensaje("No hay suficiente espacio en el disco para crear la particion", 2)
 			return
 		}
 
@@ -128,16 +125,12 @@ func agregar(size int64, unit byte, path string, tipo byte, fit string, name str
 			return
 		}
 
-		ebr := estructuras.Nodo_particion{}
-		ebr.Part_status = 1
-		ebr.Part_fit = asignar_fit(fit)
-		ebr.Part_size = asignar_size(unit, size)
-		copy(ebr.Part_name[:], name)
-
 		if disco.Logic_Exist {
 			Mensaje("Ya existe una particion extendida en el disco", 2)
 			return
 		}
+
+		ebr := estructuras.Nodo_particion{}
 
 		for i := 0; i < 4; i++ {
 			if disco.Partition[i].Part_status == 0 {
@@ -163,6 +156,7 @@ func agregar(size int64, unit byte, path string, tipo byte, fit string, name str
 			var binario2 bytes.Buffer
 			binary.Write(&binario2, binary.BigEndian, &ebr)
 			escribirBytes(file, binario2.Bytes())
+			Add_particion(path, name)
 			Mensaje("Se ha creado una particion extendida con exito", 1)
 		}
 		//Logica
@@ -196,49 +190,70 @@ func agregar(size int64, unit byte, path string, tipo byte, fit string, name str
 		error := false
 		for {
 			temp := EBR_inicial
+			//fmt.Println("tam extenda: ", tam_extendida)
+			//fmt.Println("nueva logica: ", nueva_logica.Part_size)
 			if tam+nueva_logica.Part_size <= tam_extendida {
+				//fmt.Println("entro al if 1")
+				//fmt.Println("part next: ", temp.Part_next)
 				if temp.Part_next > 0 {
+					//fmt.Println("entro al if 2")
 					ubicacion_inicial += temp.Part_size
 					tam += temp.Part_size
 
 					file.Seek(ubicacion_inicial, 0)
-					data := leerBytes(file, int(unsafe.Sizeof(EBR_inicial)))
-					buffer := bytes.NewBuffer(data)
+					data1 := leerBytes(file, int(unsafe.Sizeof(EBR_inicial)))
+					buffer2 := bytes.NewBuffer(data1)
 
-					err = binary.Read(buffer, binary.BigEndian, &EBR_inicial)
+					err = binary.Read(buffer2, binary.BigEndian, &EBR_inicial)
 					if err != nil {
 						log.Fatal("binary.Read failed", err)
 					}
 
-					fmt.Println("El EBR empieza en ", EBR_inicial.Part_size)
 				} else {
+					//fmt.Println("entro al else 2")
 					if temp.Part_size < 1 {
+						//fmt.Println("entro al if 3")
 						nueva_logica.Part_start = ubicacion_inicial
 						break
 					} else {
+						//fmt.Println("entro al else 3")
+						//fmt.Println("ubicacion inicial: ", ubicacion_inicial)
+						//fmt.Println("part size: ", temp.Part_size)
 						temp.Part_next = ubicacion_inicial + temp.Part_size
-						file.Seek(ubicacion_inicial, 0)
+						//fmt.Println("part next: ", temp.Part_next)
 
-						var binario bytes.Buffer
-						binary.Write(&binario, binary.BigEndian, &temp)
-						escribirBytes(file, binario.Bytes())
+						file.Seek(ubicacion_inicial, 0)
+						var binario33 bytes.Buffer
+						binary.Write(&binario33, binary.BigEndian, &temp)
+						escribirBytes(file, binario33.Bytes())
+
+						file.Seek(ubicacion_inicial, 0)
+						data := leerBytes(file, int(unsafe.Sizeof(EBR_inicial)))
+						buffer := bytes.NewBuffer(data)
+
+						err = binary.Read(buffer, binary.BigEndian, &EBR_inicial)
+						if err != nil {
+							log.Fatal("binary.Read failed", err)
+						}
+
 					}
 				}
 			} else {
+				//fmt.Println("entro al else 1")
 				error = true
 				break
 			}
 		}
 
 		if error {
-			Mensaje("233->No hay suficionete espacio en el disco para crear la particion", 2)
+			Mensaje("No hay suficionete espacio en el disco para crear la particion", 2)
 			return
 		} else {
 
 			file.Seek(ubicacion_inicial, 0)
-			var binario bytes.Buffer
-			binary.Write(&binario, binary.BigEndian, &nueva_logica)
-			escribirBytes(file, binario.Bytes())
+			var binario10 bytes.Buffer
+			binary.Write(&binario10, binary.BigEndian, &nueva_logica)
+			escribirBytes(file, binario10.Bytes())
 
 			Mensaje("Se ha creado una particion logica con exito", 1)
 		}
@@ -266,16 +281,18 @@ func eliminar_particion(delete string, path string, name string) {
 	eliminado := false
 	if delete == "fast" {
 		for i := 0; i < 4; i++ {
-			if strings.ToLower(string(disco.Partition[i].Part_name[:len(disco.Partition[i].Part_name)])) == strings.ToLower(name) {
+			if validar_elim(disco, name, i) {
 				disco.Partition[i].Part_status = 0
 				eliminado = true
+				break
 			}
 		}
 	} else if delete == "full" {
 		for i := 0; i < 4; i++ {
-			if strings.ToLower(string(disco.Partition[i].Part_name[:len(disco.Partition[i].Part_name)])) == strings.ToLower(name) {
-				disco.Partition[i] = estructuras.Nodo_particion{}
+			if validar_elim(disco, name, i) {
+				disco.Partition[i] = estructuras.Particion_T0()
 				eliminado = true
+				break
 			}
 		}
 	}
@@ -290,7 +307,7 @@ func eliminar_particion(delete string, path string, name string) {
 	binary.Write(&binario, binary.BigEndian, &disco)
 	escribirBytes(file, binario.Bytes())
 
-	Mensaje("Se ha creado una particion logica con exito", 1)
+	Mensaje("Se ha eliminado una particion con exito", 1)
 
 }
 
@@ -339,7 +356,8 @@ func buscar_primer_EBR(disco estructuras.Nodo_Mbr) int64 {
 }
 
 func buscar_tam_extendida(disco estructuras.Nodo_Mbr) int64 {
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 4; i++ {
+		////fmt.Println("tipo particion: ", disco.Partition[i].Part_tipo)
 		if disco.Partition[i].Part_tipo == 101 {
 			return disco.Partition[i].Part_size
 		}
@@ -349,6 +367,10 @@ func buscar_tam_extendida(disco estructuras.Nodo_Mbr) int64 {
 
 func validar_name(disco estructuras.Nodo_Mbr, name string) bool {
 	for i := 0; i < 4; i++ {
+
+		if disco.Partition[i].Part_status == 0 {
+			break
+		}
 
 		var parti string
 		if len(name) <= 16 {
@@ -361,6 +383,21 @@ func validar_name(disco estructuras.Nodo_Mbr, name string) bool {
 			return true
 		}
 	}
+
+	return false
+}
+
+func validar_elim(disco estructuras.Nodo_Mbr, name string, pos int) bool {
+	var parti string
+	if len(name) <= 16 {
+		parti = string(disco.Partition[pos].Part_name[:len(name)])
+	} else {
+		parti = string(disco.Partition[pos].Part_name[:16])
+	}
+
+	if strings.ToLower(parti) == strings.ToLower(name) {
+		return true
+	}
 	return false
 }
 
@@ -370,7 +407,6 @@ func tipo_ajuste(disco estructuras.Nodo_Mbr, particion estructuras.Nodo_particio
 
 	for i := 0; i < 4; i++ {
 		if disco.Partition[i].Part_status == 1 {
-			fmt.Println("existe particion ", i+1, " e inicia en->", disco.Partition[i].Part_start)
 			if disco.Partition[i].Part_start > inicio {
 				disponible := disco.Partition[i].Part_start - inicio
 
@@ -381,18 +417,14 @@ func tipo_ajuste(disco estructuras.Nodo_Mbr, particion estructuras.Nodo_particio
 					inicio = disco.Partition[i].Part_start + disco.Partition[i].Part_size
 				}
 			} else if disco.Partition[i].Part_start == inicio {
-				fmt.Println("entro al else de part_start > inicio")
 				inicio += disco.Partition[i].Part_size
 			}
 		}
 	}
 
 	if !encontrado {
-		fmt.Println("Entro al if del encontrado")
-		fmt.Println("El tama;o del disco es de: ", disco.Mbr_tamanio)
 		if disco.Mbr_tamanio > inicio {
 			disponible := disco.Mbr_tamanio - inicio
-			fmt.Println("el espacio disponible es de: ", disponible)
 			if disponible >= particion.Part_size {
 				return inicio
 			} else {

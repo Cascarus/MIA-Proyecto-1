@@ -8,3 +8,10 @@ type Nodo_particion struct {
 	Part_size   int64
 	Part_name   [16]byte
 }
+
+func Particion_T0() Nodo_particion {
+	e := Nodo_particion{Part_status: '0', Part_tipo: '0', Part_fit: '0'}
+	str := "null"
+	copy(e.Part_name[:], str)
+	return e
+}

@@ -1,0 +1,5 @@
+digraph structs {
+node [shape=record];
+
+struct3 [shape=record,label="mbr|Libre|{logica|{EBR| Logica | Libre |EBR|Logica }}| Primaria | Libre"];
+}

@@ -2,7 +2,11 @@ package interprete
 
 import (
 	"MIA_Proyecto1/funciones"
+	"MIA_Proyecto1/reportes"
+	"bufio"
 	"fmt"
+	"log"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -26,7 +30,9 @@ type interprete struct {
 }
 
 func New(comand string) interprete {
-	comansplit := strings.Split(comand, " -")
+	cmsplit := strings.Split(comand, "#")
+	//fmt.Println("cmsplit:" + cmsplit[0])
+	comansplit := strings.Split(cmsplit[0], " -")
 	coso := interprete{comando: comansplit}
 	limpiar()
 	return coso
@@ -36,15 +42,39 @@ func (e interprete) Ejecutar() {
 	//imprimir()
 	if strings.ToLower(e.comando[0]) == "mkdisk" {
 		Mkdisk(e.comando[1:])
+
 	} else if strings.ToLower(e.comando[0]) == "rmdisk" {
 		Mrdisk(e.comando[1:])
+
 	} else if strings.ToLower(e.comando[0]) == "fdisk" {
 		Fdisk(e.comando[1:])
+
 	} else if strings.ToLower(e.comando[0]) == "rep" {
 		Rep(e.comando[1:])
+
+	} else if strings.ToLower(e.comando[0]) == "exec" {
+		Exec(e.comando[1:])
+
+	} else if strings.ToLower(e.comando[0]) == "pause" {
+		funciones.Mensaje("Presione enter para continuar", 0)
+		reader := bufio.NewReader(os.Stdin)
+		comando, _ := reader.ReadString('\n')
+		funciones.Mensaje(comando, 0)
+
+	} else if strings.ToLower(e.comando[0]) == "mount" {
+		Mount(e.comando[1:])
+
+	} else if strings.ToLower(e.comando[0]) == "unmount" {
+		UnMount(e.comando[1:])
+
+	} else if strings.ToLower(e.comando[0]) == "mkfs" {
+		Mkfs(e.comando[1:])
+
+	} else {
+		funciones.Mensaje("No existe ningun comando con ese parametro", 2)
 	}
 	//imprimir()
-	//fmt.Println("\033[1;32mMENSAJE: El disco se ha creado exitosamente!\033[0m")
+	////fmt.Println("\033[1;32mMENSAJE: El disco se ha creado exitosamente!\033[0m")
 }
 
 func Mkdisk(contenido []string) {
@@ -72,8 +102,8 @@ func Mkdisk(contenido []string) {
 	}
 
 	verificar := strings.Split(name, ".")
-	fmt.Println(name)
-	//fmt.Println(verificar[0], " ", verificar[1])
+	////fmt.Println(name)
+	////fmt.Println(verificar[0], " ", verificar[1])
 	if len(verificar) == 2 && strings.ToLower(verificar[1]) != "dsk" {
 		funciones.Mensaje("1. El parametro name debe de llevar nombre y la extencion .dsk", 2)
 		return
@@ -87,11 +117,11 @@ func Mkdisk(contenido []string) {
 		return
 	}
 
-	//fmt.Println("Se creara un disco con -size=", size, "-path=", path, "-name=", name, "-unit=", unit)
+	////fmt.Println("Se creara un disco con -size=", size, "-path=", path, "-name=", name, "-unit=", unit)
 	mkd := funciones.NewMKDisk(size, path, name, unit)
 	//mkd.Ejecutar(5846, 21, 3000)
 	mkd.Ejecutar()
-	//fmt.Println("Reading File: ")
+	////fmt.Println("Reading File: ")
 	//mkd.ReadFile()
 }
 
@@ -101,7 +131,7 @@ func Mrdisk(contenido []string) {
 	if len(contenido) == 1 {
 		temp := strings.Split(contenido[0], "->")
 
-		if strings.ToLower(temp[0]) == "-path" {
+		if strings.ToLower(temp[0]) == "path" {
 			sin_comillas := strings.Trim(temp[1], "\"")
 			//sin_pslice := strings.TrimLeft(sin_comillas, "/")
 			path = sin_comillas
@@ -163,9 +193,80 @@ func Fdisk(contenido []string) {
 
 	}
 
-	//fmt.Println("Se ejecuatara FDISK con -size=", size, "-path=", path, "-name=", name, "-unit=", unit, "-type=", tipo, "-fit=", fit, "-delete=", eliminar, "-add=", agregar)
+	////fmt.Println("Se ejecuatara FDISK con -size=", size, "-path=", path, "-name=", name, "-unit=", unit, "-type=", tipo, "-fit=", fit, "-delete=", eliminar, "-add=", agregar)
 	fdisk := funciones.NewFDisk(size, unit, path, tipo, fit, eliminar, name, agregar, opcionFD)
 	fdisk.Ejecutar()
+}
+
+func Exec(contenido []string) {
+	var path string
+
+	if len(contenido) == 1 {
+		temp := strings.Split(contenido[0], "->")
+
+		if strings.ToLower(temp[0]) == "path" {
+			sin_comillas := strings.Trim(temp[1], "\"")
+			//sin_pslice := strings.TrimLeft(sin_comillas, "/")
+			path = sin_comillas
+		} else {
+			funciones.Mensaje("Exec solo puede llevar Path", 2)
+			return
+		}
+	} else if len(contenido) == 0 {
+		funciones.Mensaje("Exec debe llevar un path", 2)
+		return
+
+	} else {
+		funciones.Mensaje("Exec no puede llevar otro parametro que no sea path", 2)
+		return
+	}
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		funciones.Mensaje("No existe un archivo con ese nombre en el directorio", 2)
+		return
+
+	} else {
+		f, err := os.Open(path)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+
+		com := ""
+
+		for scanner.Scan() {
+
+			if scanner.Text() != "" {
+				if scanner.Text()[0] != '#' {
+					com += scanner.Text()
+
+					if string(com[len(com)-1]) != "*" {
+						fmt.Println(com)
+						inter := New(com)
+						inter.Ejecutar()
+						com = ""
+					} else {
+						com2 := strings.Trim(com, "\\*")
+						com = com2 + " "
+					}
+				} else {
+					fmt.Println(scanner.Text())
+				}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	//mrd := funciones.NewMRDisk(path)
+	//mrd.Ejecutar()
+
 }
 
 func Rep(contenido []string) {
@@ -186,6 +287,71 @@ func Rep(contenido []string) {
 		funciones.Mensaje("Rep debe de llevar el id de una particion", 2)
 		return
 	}
+	////fmt.Println("Se ejecuatara REP con -nombre=", nombre, "-path=", path, "-ID=", IDs)
+	rep := reportes.NewReporte(path, nombre, IDs)
+	rep.Generar()
+}
+
+func Mount(contenido []string) {
+	//fmt.Println("analizo el mount")
+
+	if len(contenido) > 0 {
+		Opciones_Parametro(contenido)
+
+		if errorGeneral == true {
+			//fmt.Printf("hubo error en mount")
+			return
+		}
+
+		if name == "default" {
+			funciones.Mensaje("Mount debe de llevar un nombre", 2)
+			return
+		} else if path == "default" {
+			funciones.Mensaje("Mount debe de llevar un path", 2)
+			return
+		}
+
+		funciones.Mount(path, name)
+	} else {
+		funciones.Mostrar_mounts()
+	}
+
+}
+
+func UnMount(contenido []string) {
+	for i := 0; i < len(contenido); i++ {
+		temp := strings.Split(contenido[i], "->")
+
+		if strings.ToLower(temp[1]) == "" {
+			funciones.Mensaje("Id debe de llevar un nombre", 2)
+			return
+		}
+		IDs = temp[1]
+
+		if IDs == "default" {
+			funciones.Mensaje("UnMount debe de llevar un nombre", 2)
+			return
+		}
+
+		funciones.Unmount(IDs)
+	}
+}
+
+func Mkfs(contenido []string) {
+	Opciones_Parametro(contenido)
+
+	if errorGeneral == true {
+		return
+	}
+
+	if IDs == "default" {
+		funciones.Mensaje("FDISK debe de llevar un nombre", 2)
+		return
+	}
+
+	mkfs := funciones.NewMkfs(IDs, unit, tipo, agregar)
+	mkfs.Ejecutar()
+
 }
 
 func Opciones_Parametro(contenido []string) {
@@ -203,9 +369,15 @@ func Opciones_Parametro(contenido []string) {
 			size = size_temp
 
 		} else if strings.ToLower(temp[0]) == "path" {
-			sin_comillas := strings.Trim(temp[1], "\"")
-			path = sin_comillas
-			//fmt.Println(path)
+			//fmt.Println("viene:" + temp[1])
+
+			if temp[1][0] == '"' {
+				sin_comillas := strings.Split(temp[1], "\"")
+				path = sin_comillas[1]
+				//fmt.Println(path)
+			} else {
+				path = temp[1]
+			}
 
 		} else if strings.ToLower(temp[0]) == "ruta" {
 			sin_comillas := strings.Trim(temp[1], "\"")
@@ -340,15 +512,15 @@ func limpiar() {
 }
 
 func imprimir() {
-	fmt.Println("path: ", path)
-	fmt.Println("size: ", size)
-	fmt.Println("name: ", name)
-	fmt.Println("unit: ", unit)
-	fmt.Println("tipo: ", tipo)
-	fmt.Println("fit: ", fit)
-	fmt.Println("delete: ", eliminar)
-	fmt.Println("add: ", agregar)
-	fmt.Println("IDs: ", IDs)
-	fmt.Println("opcionFD: ", opcionFD)
-	fmt.Println("ErrorG: ", errorGeneral)
+	//fmt.Println("path: ", path)
+	//fmt.Println("size: ", size)
+	//fmt.Println("name: ", name)
+	//fmt.Println("unit: ", unit)
+	//fmt.Println("tipo: ", tipo)
+	//fmt.Println("fit: ", fit)
+	//fmt.Println("delete: ", eliminar)
+	//fmt.Println("add: ", agregar)
+	//fmt.Println("IDs: ", IDs)
+	//fmt.Println("opcionFD: ", opcionFD)
+	//fmt.Println("ErrorG: ", errorGeneral)
 }

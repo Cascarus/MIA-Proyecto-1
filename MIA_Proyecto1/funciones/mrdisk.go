@@ -14,7 +14,7 @@ type mrdisk struct {
 
 func NewMRDisk(path string) mrdisk {
 	e := mrdisk{path}
-	fmt.Println("Creo el nuevo MRDIS")
+	//fmt.Println("Creo el nuevo MRDIS")
 	return e
 }
 
@@ -37,8 +37,10 @@ func (e mrdisk) Ejecutar() {
 			if r != nil {
 				log.Fatal(r)
 			}
-			Mensaje("El disco se ha eliminado3 exitosamente", 1)
+			Mensaje("El disco se ha eliminado exitosamente", 1)
+			return
 		}
+		fmt.Println("")
 	}
 
 }
